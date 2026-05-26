@@ -10,12 +10,12 @@ if "timezone" not in st.session_state:
     st.session_state.timezone = 7 
 if "tasks" not in st.session_state:
     
-    st.session_state.tasks = {"Type the task 1": False, "Type the task 2": False, "Type the task 3": False}
+    st.session_state.tasks = {}
 if "chat_messages" not in st.session_state:
     st.session_state.chat_messages = []
 if "streak_data" not in st.session_state:
     
-    st.session_state.streak_data = {"Monday": 1, "Tuesday": 2, "Wednesday": 4, "Thursday": 5, "Friday": 4}
+    st.session_state.streak_data = {"Monday": None, "Tuesday": None, "Wednesday": None, "Thursday": None, "Friday": None, "Saturday": None, "Sunday": None}
 
 
 st.sidebar.title("Menu")
@@ -36,10 +36,7 @@ if page == "Settings":
     st.session_state.timezone = tz_options[selected_tz_name]
     st.success(f"Timezone updated successfully!")
     
-    st.divider()
     
-    st.subheader("Dark Mode")
-    st.info("Streamlit handles Dark Mode automatically based on your computer's system theme! If you want to force it, click the three dots (⋮) in the top right corner of the page > Settings > Theme > Dark.")
 
 
 
@@ -62,8 +59,8 @@ elif page == "Tracker":
     task_progress = completed_tasks / total_tasks if total_tasks > 0 else 0.0
 
     st.progress(task_progress, text=f"Task Progress ({completed_tasks}/{total_tasks})")
-    st.progress(day_progress, text=f"Time Left (Day) - Current Time: {now.strftime('%H:%M')}")
-    st.progress(week_progress, text="Time Left (Week)")
+    st.progress(day_progress, text=f"Day Progression - Current Time: {now.strftime('%H:%M')}")
+    st.progress(week_progress, text="Week Progression")
     
     st.divider()
 
@@ -92,7 +89,7 @@ elif page == "Tracker":
                     st.markdown(message["content"])
         
        
-        if prompt := st.chat_input("Type to Start Consulting..."):
+        if prompt := st.chat_input("Type Here to Start Consulting..."):
             
             st.session_state.chat_messages.append({"role": "user", "content": prompt})
             
@@ -120,7 +117,7 @@ elif page == "Tracker":
     st.divider()
 
    
-    st.subheader("Task Completion Graph")
+    st.subheader("Task Completion Graph (Per Day)")
     
     df = pd.DataFrame(
         list(st.session_state.streak_data.items()),
