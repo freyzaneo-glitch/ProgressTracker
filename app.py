@@ -83,16 +83,23 @@ st.sidebar.caption("Connected to Cloud Database")
 
 # SETTINGS PAGE
 if page == "Settings":
-    st.title("Settings")
+    st.title("Settings ⚙️")
     
-    st.subheader("Timezone Configuration")
-    
+    st.subheader(f"Timezone for {st.session_state.current_user}")
     tz_options = {"WIB (UTC+7)": 7, "WITA (UTC+8)": 8, "WIT (UTC+9)": 9}
     
-    selected_tz_name = st.selectbox("Select your local time:", list(tz_options.keys()))
+    current_tz_name = "WIB (UTC+7)"
+    for name, offset in tz_options.items():
+        if offset == st.session_state.timezone:
+            current_tz_name = name
+            break
+            
+    selected_tz_name = st.selectbox("Select local time:", list(tz_options.keys()), index=list(tz_options.keys()).index(current_tz_name))
     
-    st.session_state.timezone = tz_options[selected_tz_name]
-    st.success(f"Timezone updated successfully!")
+    if tz_options[selected_tz_name] != st.session_state.timezone:
+        st.session_state.timezone = tz_options[selected_tz_name]
+        save_user_data(st.session_state.current_user, st.session_state.timezone, st.session_state.tasks, st.session_state.streak_data)
+        st.success("Timezone saved to cloud!")
     
 # TRACKER PAGE
 elif page == "Tracker":
@@ -115,7 +122,6 @@ elif page == "Tracker":
     st.progress(task_progress, text=f"Task Progress ({completed_tasks}/{total_tasks})")
     st.progress(day_progress, text=f"Day Progression - Current Time: {now.strftime('%H:%M')}")
     st.progress(week_progress, text="Week Progression")
-    
     st.divider()
 
     col1, col2 = st.columns(2)
@@ -124,13 +130,18 @@ elif page == "Tracker":
         st.subheader("Tasks")
         
         for task, is_done in st.session_state.tasks.items():
+            new_status = st.checkbox(task, value=is_done)
             
-            st.session_state.tasks[task] = st.checkbox(task, value=is_done)
+            if new_status != is_done:
+                st.session_state.tasks[task] = new_status
+                save_user_data(st.session_state.current_user, st.session_state.timezone, st.session_state.tasks, st.session_state.streak_data)
+                st.rerun() 
             
         new_task = st.text_input("Add a new task...")
         if st.button("Add Task") and new_task:
             st.session_state.tasks[new_task] = False
-            st.rerun() 
+            save_user_data(st.session_state.current_user, st.session_state.timezone, st.session_state.tasks, st.session_state.streak_data)
+            st.rerun()
 
     with col2:
         st.subheader("AI Consultant")
@@ -144,16 +155,13 @@ elif page == "Tracker":
         
        
         if prompt := st.chat_input("Type Here to Start Consulting..."):
-            
-            st.session_state.chat_messages.append({"role": "user", "content": prompt})
-            
+            st.session_state.chat_messages.append({"role": "user", "content": prompt})    
             with chat_container:
                 with st.chat_message("user"):
                     st.markdown(prompt)
                 
                 with st.chat_message("assistant"):
-                    try:
-                       
+                    try:            
                         client = OpenAI(
                             api_key=st.secrets["GROQ_API_KEY"],
                             base_url="https://api.groq.com/openai/v1"
@@ -168,11 +176,9 @@ elif page == "Tracker":
                     except Exception as e:
                         st.error("Under Maintenance")
                         st.error("ERROR CODE : 2")
-
     st.divider()
 
-    st.subheader("Task Completion Graph (Per Day)")
-    
+    st.subheader("Task Completion Graph (Per Day)")    
     df = pd.DataFrame(
         list(st.session_state.streak_data.items()),
         columns=['Day', 'Tasks Completed']
