@@ -2,6 +2,8 @@ import streamlit as st
 from datetime import datetime, timedelta
 import pandas as pd
 from openai import OpenAI
+import gspread
+import json
 
 st.set_page_config(layout="wide", page_title="Activity Progress")
 
