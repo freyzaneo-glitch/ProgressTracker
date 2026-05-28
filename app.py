@@ -22,7 +22,8 @@ def init_gsheets():
 try:
     sheet = init_gsheets()
 except Exception as e:
-    st.error("Could not connect to Google Sheets. Check your Secrets.")
+    st.error("Under Maintenance, please wait until the problem gets fixed.")
+    st.error("ERROR CODE = 1")
     st.stop()
 
 def load_user_data(name):
@@ -165,7 +166,8 @@ elif page == "Tracker":
                         response = st.write_stream(stream)
                         st.session_state.chat_messages.append({"role": "assistant", "content": response})
                     except Exception as e:
-                        st.error("Oops! API Key missing. Please check your secrets setup.")
+                        st.error("Under Maintenance")
+                        st.error("ERROR CODE : 2")
 
     st.divider()
 
