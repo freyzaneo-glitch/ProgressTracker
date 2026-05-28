@@ -23,7 +23,7 @@ except Exception as e:
     st.error("Could not connect to Google Sheets. Check your Secrets.")
     st.stop()
 
-load_user_data(name):
+def load_user_data(name):
     records = sheet.get_all_records()
     for row in records:
         if row["Name"] == name:
