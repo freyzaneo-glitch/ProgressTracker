@@ -2,105 +2,44 @@ import streamlit as st
 from datetime import datetime, timedelta
 import pandas as pd
 from openai import OpenAI
-import gspread
-import json
+
 
 st.set_page_config(layout="wide", page_title="Activity Progress")
 
-# GSHEET connection
-@st.cache_resource
-def init_gsheets():
+if "timezone" not in st.session_state:
+    st.session_state.timezone = 7 
+if "tasks" not in st.session_state:
     
-    creds_dict = json.loads(st.secrets["GCP_CREDENTIALS"])
-   
-    client = gspread.service_account_from_dict(creds_dict)
-    
-    sheet = client.open_by_url(st.secrets["SHEET_URL"]).sheet1
-    return sheet
-
-# Database
-try:
-    sheet = init_gsheets()
-except Exception as e:
-    st.error("Under Maintenance, please wait until the problem gets fixed.")
-    st.error("ERROR CODE = 1")
-    st.stop()
-
-def load_user_data(name):
-    records = sheet.get_all_records()
-    for row in records:
-        if row["Name"] == name:
-            
-            return {
-                "timezone": int(row["Timezone"]),
-                "tasks": json.loads(row["Tasks"]),
-                "streak_data": json.loads(row["Streak"])
-            }
-    
-    return {
-        "timezone": 7,
-        "tasks": {},
-        "streak_data": {}
-    }
-
-def save_user_data(name, tz, tasks, streak):
-    records = sheet.get_all_records()
-    
-    tasks_text = json.dumps(tasks)
-    streak_text = json.dumps(streak)
-       
-    for i, row in enumerate(records):
-        if row["Name"] == name:
-            
-            sheet.update_cell(i + 2, 2, tz)
-            sheet.update_cell(i + 2, 3, tasks_text)
-            sheet.update_cell(i + 2, 4, streak_text)
-            return
-            
-    sheet.append_row([name, tz, tasks_text, streak_text])
-
-# Memory
+    st.session_state.tasks = {}
 if "chat_messages" not in st.session_state:
     st.session_state.chat_messages = []
+if "streak_data" not in st.session_state:
+    
+    st.session_state.streak_data = {"Monday": None, "Tuesday": None, "Wednesday": None, "Thursday": None, "Friday": None, "Saturday": None, "Sunday": None}
+
 
 st.sidebar.title("Menu")
 
-users = ["User 1", "User 2", "User 3", "User 4", "User 5"]
-selected_user = st.sidebar.selectbox("👤 Select Profile:", users)
-
-if "current_user" not in st.session_state or st.session_state.current_user != selected_user:
-    st.session_state.current_user = selected_user
-    user_data = load_user_data(selected_user)
-    
-    st.session_state.timezone = user_data["timezone"]
-    st.session_state.tasks = user_data["tasks"]
-    st.session_state.streak_data = user_data["streak_data"]
-    st.session_state.chat_messages = []
-
 page = st.sidebar.radio("Go to", ["Tracker", "Settings"])
-st.sidebar.divider()
-st.sidebar.caption("Connected to Cloud Database")
+
 
 # SETTINGS PAGE
 if page == "Settings":
-    st.title("Settings ⚙️")
+    st.title("Settings")
     
-    st.subheader(f"Timezone for {st.session_state.current_user}")
+    st.subheader("Timezone Configuration")
+    
     tz_options = {"WIB (UTC+7)": 7, "WITA (UTC+8)": 8, "WIT (UTC+9)": 9}
     
-    current_tz_name = "WIB (UTC+7)"
-    for name, offset in tz_options.items():
-        if offset == st.session_state.timezone:
-            current_tz_name = name
-            break
-            
-    selected_tz_name = st.selectbox("Select local time:", list(tz_options.keys()), index=list(tz_options.keys()).index(current_tz_name))
+    selected_tz_name = st.selectbox("Select your local time:", list(tz_options.keys()))
     
-    if tz_options[selected_tz_name] != st.session_state.timezone:
-        st.session_state.timezone = tz_options[selected_tz_name]
-        save_user_data(st.session_state.current_user, st.session_state.timezone, st.session_state.tasks, st.session_state.streak_data)
-        st.success("Timezone saved to cloud!")
+    st.session_state.timezone = tz_options[selected_tz_name]
+    st.success(f"Timezone updated successfully!")
     
+    
+
+
+
 # TRACKER PAGE
 elif page == "Tracker":
     st.title("My Activity Tracker")
@@ -122,6 +61,7 @@ elif page == "Tracker":
     st.progress(task_progress, text=f"Task Progress ({completed_tasks}/{total_tasks})")
     st.progress(day_progress, text=f"Day Progression - Current Time: {now.strftime('%H:%M')}")
     st.progress(week_progress, text="Week Progression")
+    
     st.divider()
 
     col1, col2 = st.columns(2)
@@ -130,18 +70,13 @@ elif page == "Tracker":
         st.subheader("Tasks")
         
         for task, is_done in st.session_state.tasks.items():
-            new_status = st.checkbox(task, value=is_done)
             
-            if new_status != is_done:
-                st.session_state.tasks[task] = new_status
-                save_user_data(st.session_state.current_user, st.session_state.timezone, st.session_state.tasks, st.session_state.streak_data)
-                st.rerun() 
+            st.session_state.tasks[task] = st.checkbox(task, value=is_done)
             
         new_task = st.text_input("Add a new task...")
         if st.button("Add Task") and new_task:
             st.session_state.tasks[new_task] = False
-            save_user_data(st.session_state.current_user, st.session_state.timezone, st.session_state.tasks, st.session_state.streak_data)
-            st.rerun()
+            st.rerun() 
 
     with col2:
         st.subheader("AI Consultant")
@@ -155,13 +90,16 @@ elif page == "Tracker":
         
        
         if prompt := st.chat_input("Type Here to Start Consulting..."):
-            st.session_state.chat_messages.append({"role": "user", "content": prompt})    
+            
+            st.session_state.chat_messages.append({"role": "user", "content": prompt})
+            
             with chat_container:
                 with st.chat_message("user"):
                     st.markdown(prompt)
                 
                 with st.chat_message("assistant"):
-                    try:            
+                    try:
+                       
                         client = OpenAI(
                             api_key=st.secrets["GROQ_API_KEY"],
                             base_url="https://api.groq.com/openai/v1"
@@ -174,11 +112,13 @@ elif page == "Tracker":
                         response = st.write_stream(stream)
                         st.session_state.chat_messages.append({"role": "assistant", "content": response})
                     except Exception as e:
-                        st.error("Under Maintenance")
-                        st.error("ERROR CODE : 2")
+                        st.error("Oops! API Key missing. Please check your secrets setup.")
+
     st.divider()
 
-    st.subheader("Task Completion Graph (Per Day)")    
+   
+    st.subheader("Task Completion Graph (Per Day)")
+    
     df = pd.DataFrame(
         list(st.session_state.streak_data.items()),
         columns=['Day', 'Tasks Completed']
